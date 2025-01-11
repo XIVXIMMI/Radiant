@@ -28,6 +28,16 @@ public:
 
 	ACloudBurst* CloudBurstInstance;
 
+	//Firing Variables
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	bool bCanFire;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	float FireRate;	
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	int32 FireCount;
+	
 	//Dash Variables
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Dash)
 	float DashSpeed;
@@ -112,6 +122,12 @@ protected:
 
 	/*Interaction*/
 	void Interact(FHitResult* OtherActor);
+
+	/*Weapon Firing*/
+	UFUNCTION()
+	void Fire();
+
+	virtual void BeginPlay();
 
 	void Tick(float DeltaTime) override;
 };

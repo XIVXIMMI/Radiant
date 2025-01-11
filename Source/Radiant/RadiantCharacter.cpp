@@ -42,6 +42,7 @@ ARadiantCharacter::ARadiantCharacter()
 	bInteractApplied = false;
 
 	bIsFloating = false;
+	bIsFiring = false;
 
 
 	// Enum Default Values
@@ -81,7 +82,8 @@ void ARadiantCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ARadiantCharacter::StopJumping);
 
 	// Bind fire event
-	PlayerInputComponent->BindAction("PrimaryAction", IE_Pressed, this, &ARadiantCharacter::OnPrimaryAction);
+	PlayerInputComponent->BindAction("PrimaryAction", IE_Pressed, this, &ARadiantCharacter::OnPrimaryAction);	
+	PlayerInputComponent->BindAction("PrimaryAction", IE_Released, this, &ARadiantCharacter::StopPrimaryAction);
 
 	// Enable touchscreen input
 	EnableTouchscreenMovement(PlayerInputComponent);
@@ -103,6 +105,13 @@ void ARadiantCharacter::OnPrimaryAction()
 {
 	// Trigger the OnItemUsed Event
 	OnUseItem.Broadcast();
+	bIsFiring = true;
+	OnFireWeapon.Broadcast();
+}
+
+void ARadiantCharacter::StopPrimaryAction()
+{
+	bIsFiring = false;
 }
 
 void ARadiantCharacter::BeginTouch(const ETouchIndex::Type FingerIndex, const FVector Location)
@@ -248,4 +257,14 @@ void ARadiantCharacter::StopJumping()
 void ARadiantCharacter::Interact() 
 {
 	bInteractApplied = true;
+}
+
+void ARadiantCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (bIsFiring)
+	{
+		OnFireWeapon.Broadcast();
+	}
 }

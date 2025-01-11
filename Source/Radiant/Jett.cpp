@@ -29,6 +29,17 @@ AJett::AJett()
 
 	JettForwardVector;
 	JettRightVector;
+
+	bCanFire = false;
+	FireRate = 1.00f;
+	FireCount = 0;
+}
+
+void AJett::BeginPlay() 
+{
+	Super::BeginPlay();
+
+	OnFireWeapon.AddDynamic(this, &AJett::Fire);
 }
 
 void AJett::Dash()
@@ -92,10 +103,27 @@ void AJett::Interact(FHitResult* OtherActor)
 	bInteractApplied = false;
 }
 
+void AJett::Fire() 
+{
+	/*RayCast Parameters*/
+	FHitResult* HitResult = new FHitResult();
+	FVector StartTrace = GetFirstPersonCameraComponent()->GetComponentLocation();
+	FVector ForwardVector = GetFirstPersonCameraComponent()->GetForwardVector();
+	FCollisionQueryParams* CQP = new FCollisionQueryParams();
+
+	if (GetWorld()->LineTraceSingleByChannel(*HitResult, StartTrace, ((ForwardVector * 1000.0f) + StartTrace), ECC_Visibility, *CQP))
+	{
+		DrawDebugLine(GetWorld(), StartTrace, (ForwardVector * 50000.0f + StartTrace), FColor(255, 255, 0), true);
+	}
+	FireCount += 1;
+	bCanFire = false;
+	FireRate = 1.00f;
+}
+
 void AJett::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	
+
 	/*Jett Drift*/
 	if (bIsFloating && GetVelocity().Z < 0)
 	{
@@ -154,6 +182,15 @@ void AJett::Tick(float DeltaTime)
 			bDashUI = true;
 			bAbilityTimerStart = false;
 			FirstAbilityCooldown = 10.0f;
+		}
+	}
+
+	if (!bCanFire) 
+	{
+		FireRate -= DeltaTime * 100;
+		if (FireRate < 0) 
+		{
+			bCanFire = true;
 		}
 	}
 
@@ -336,6 +373,7 @@ void AJett::Tick(float DeltaTime)
 				if (bInteractApplied)
 				{
 					EWeapon = EWeaponEquipped::EPrimary;
+					bCanFire = true;
 					AJett::Interact(HitResult);
 					DrawDebugLine(GetWorld(), NewStartTrace, ((GetFirstPersonCameraComponent()->GetForwardVector() * 100.0f) + NewStartTrace), FColor(255, 0, 0), true);
 				}

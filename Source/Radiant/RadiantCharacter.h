@@ -18,6 +18,7 @@ class USoundBase;
 // Declaration of the delegate that will be called when the Primary Action is triggered
 // It is declared as dynamic so it can be accessed also in Blueprints
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnUseItem);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FStopUseItem);
 
 UCLASS(config=Game)
 class ARadiantCharacter : public ACharacter
@@ -58,7 +59,10 @@ public:
 	
 	// Movement & Firing Error Variables
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement)
-	bool bIsFloating;
+	bool bIsFloating;	
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement)
+	bool bIsFiring;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement)
 	float MovementError;
@@ -78,6 +82,7 @@ public:
 	TEnumAsByte<EMovementDirection> EOrientation;
 
 	// Enum to identify weapon currently equipped
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
 	TEnumAsByte<EWeaponEquipped> EWeapon;
 
 protected:
@@ -91,10 +96,15 @@ public:
 	/** Delegate to whom anyone can subscribe to receive this event */
 	UPROPERTY(BlueprintAssignable, Category = "Interaction")
 	FOnUseItem OnUseItem;
+	
+	UPROPERTY(BlueprintAssignable, Category = "Interaction")
+	FOnUseItem OnFireWeapon;
 protected:
 	
 	/** Fires a projectile. */
 	void OnPrimaryAction();
+	
+	void StopPrimaryAction();
 
 	/** Handles moving forward/backward */
 	void MoveForward(float Val);
@@ -120,6 +130,8 @@ protected:
 	void StopThirdAbility();
 
 	void Interact();
+
+	void Tick(float DeltaTime) override;
 
 	/**
 	 * Called via input to turn at a given rate.
