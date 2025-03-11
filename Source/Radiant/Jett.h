@@ -1,4 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -6,12 +7,16 @@
 #include "RadiantCharacter.h"
 #include "Engine.h"
 #include "CloudBurst.h"
+#include "JettKnife.h"
 #include "Components/ActorComponent.h"
 #include "Jett.generated.h"
 
 class ACloudBurst;
+class AJettKnife;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAbilityAudio);
 /**
- * 
+ Jett Class
  */
 UCLASS()
 class RADIANT_API AJett : public ARadiantCharacter
@@ -22,21 +27,25 @@ public:
 	//constructor
 	AJett();
 
+	/* Knife class to spawn */
+	UPROPERTY(EditDefaultsOnly, Category = Ult)
+	TSubclassOf<class AJettKnife> Knife;
+
+	AJettKnife* Knife1Instance;
+	AJettKnife* Knife2Instance;
+	AJettKnife* Knife3Instance;
+	AJettKnife* Knife4Instance;
+	AJettKnife* Knife5Instance;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Ult")
+	int32 KnifeCount;
+
 	/* CloudBurst class to spawn */
 	UPROPERTY(EditDefaultsOnly, Category = Smoke)
 	TSubclassOf<class ASmoke> Cloud;
-
+	
 	ACloudBurst* CloudBurstInstance;
 
-	//Firing Variables
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
-	bool bCanFire;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
-	float FireRate;	
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
-	int32 FireCount;
 	
 	//Dash Variables
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Dash)
@@ -75,6 +84,12 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Dash)
 	bool bIsDashing;
 	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Dash)
+	int32 DashResetStart;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Dash)
+	int32 DashResetKills;
+	
 
 	// Movement Variables
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -108,6 +123,19 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = CloudBurst)
 	int CloudBurstStorage;
+	
+	// Audio Variables
+	UPROPERTY(BlueprintAssignable, Category = "Audio")
+	FOnAbilityAudio OnDashActivated;
+	
+	UPROPERTY(BlueprintAssignable, Category = "Audio")
+	FOnAbilityAudio OnDashStarted;
+	
+	UPROPERTY(BlueprintAssignable, Category = "Audio")
+	FOnAbilityAudio OnUpdraftStarted;
+	
+	UPROPERTY(BlueprintAssignable, Category = "Audio")
+	FOnAbilityAudio OnUltStarted;
 
 
 protected:
@@ -120,12 +148,8 @@ protected:
 	/*Jett Cloudburst*/
 	AActor* CloudBurst();
 
-	/*Interaction*/
-	void Interact(FHitResult* OtherActor);
-
-	/*Weapon Firing*/
-	UFUNCTION()
-	void Fire();
+	/*Jett Ult*/
+	void Knives();
 
 	virtual void BeginPlay();
 

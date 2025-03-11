@@ -4,6 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Kismet/GameplayStatics.h"
+#include "Enemy.h"
+#include "Vandal.h"
 #include "DirectionEnum.h"
 #include "WeaponEnum.h"
 #include "RadiantCharacter.generated.h"
@@ -14,6 +17,8 @@ class USceneComponent;
 class UCameraComponent;
 class UAnimMontage;
 class USoundBase;
+class AVandal;
+class AEnemy;
 
 // Declaration of the delegate that will be called when the Primary Action is triggered
 // It is declared as dynamic so it can be accessed also in Blueprints
@@ -57,8 +62,42 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Ability)
 	bool bControllingThirdAbility;
 	
+	//Firing Variables
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	bool bCanFire;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	float FireRate;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	int32 FireCount;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Weapon)
+	bool bSpawnDecal;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	FVector DecalLocation;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	FVector_NetQuantizeNormal DecalNormal;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	FHitResult BodyPartHit;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	AActor* ActorHit;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Weapon)
+	int32 DamageDealt;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	AEnemy* EnemyHit;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	int32 Kills;
+	
 	// Movement & Firing Error Variables
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Movement)
 	bool bIsFloating;	
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement)
@@ -70,9 +109,45 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement)
 	float FiringError;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Shooting)
+	bool bApplyRecoil;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Shooting)
+	bool bApplyHorizontalRecoil;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Shooting)
+	bool bRecoilReset;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Shooting)
+	float RecoilAmount;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Shooting)
+	float RecoilDuration;
+
 	// Interaction Boolean
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Ability)
 	bool bInteractApplied;
+
+	// Ult Variables
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Ult")
+	int32 UltOrbs;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Ult")
+	int32 MaxUltOrbs;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Ult")
+	bool bUltUi;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Ult")
+	bool bUltActivated;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Ult")
+	bool bCanUlt;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Ult")
+	bool bUltFired;
+
+	AVandal* VandalInstance;
 
 	// Enums to identify direction and orientation
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement)
@@ -99,12 +174,20 @@ public:
 	
 	UPROPERTY(BlueprintAssignable, Category = "Interaction")
 	FOnUseItem OnFireWeapon;
+	
+	UPROPERTY(BlueprintAssignable, Category = "Interaction")
+	FOnUseItem OnEnemyHit;
+
 protected:
 	
 	/** Fires a projectile. */
+	UFUNCTION()
 	void OnPrimaryAction();
 	
 	void StopPrimaryAction();
+
+	/*Interaction Function*/
+	void Interact(FHitResult* OtherActor);
 
 	/** Handles moving forward/backward */
 	void MoveForward(float Val);
@@ -129,7 +212,9 @@ protected:
 
 	void StopThirdAbility();
 
-	void Interact();
+	void InteractPressed();
+	
+	void Ultimate();
 
 	void Tick(float DeltaTime) override;
 

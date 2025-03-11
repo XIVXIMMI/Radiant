@@ -16,16 +16,13 @@ AVandal::AVandal()
 
 	PickUpSphere->SetupAttachment(VandalMesh);
 
-	//PickUpSphere->OnComponentHit.AddDynamic(this, &AVandal::OnHit);
-
-	bDisplayUI = false;
-
 }
 
 // Called when the game starts or when spawned
 void AVandal::BeginPlay()
 {
 	Super::BeginPlay();
+	
 	
 }
 
@@ -35,12 +32,3 @@ void AVandal::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 }
-
-void AVandal::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit) 
-{
-	if (OtherActor != NULL) 
-	{
-
-	}
-}
-

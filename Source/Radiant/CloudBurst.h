@@ -7,6 +7,7 @@
 #include "CloudBurst.generated.h"
 
 class UProjectileMovementComponent;
+
 /**
  * 
  */
@@ -22,8 +23,11 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement)
 	UProjectileMovementComponent* CloudBurstMovement;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Collision)
-	bool DidItHit;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Collision)
+	bool bDidItHit;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Collision)
+	bool bAudioStart;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Collision)
 	float FullCloudTimer;
@@ -35,6 +39,7 @@ public:
 	void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
 	
 	void Tick(float DeltaTime) override;
+	
 
 protected:
 	virtual void BeginPlay() override;

@@ -10,6 +10,7 @@ ACloudBurst::ACloudBurst()
 	CloudBurstMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("Projectile Movement"));
 
 	RootComponent = OuterSmoke;
+
 	//CloudBurst movement physics
 	CloudBurstMovement->UpdatedComponent = OuterSmoke;
 	CloudBurstMovement->InitialSpeed = 3000.0f;
@@ -19,7 +20,8 @@ ACloudBurst::ACloudBurst()
 
 	FullCloudTimer = 3.0f;
 	FlyingTimer = 3.0f;
-	DidItHit = false;
+	bDidItHit = false;
+	bAudioStart = false;
 
 	LerpDigit = 2.0f;
 }
@@ -28,8 +30,9 @@ void ACloudBurst::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	//InnerSmoke->SetRelativeLocation(OuterSmoke->GetRelativeLocation());
-	if (DidItHit)
+	// controlling the size of the cloudburst once it collides with the ground or wall
+	// if the cloudburst spends too much time without colliding, we stop its movement mid-air
+	if (bDidItHit)
 	{
 		LerpDigit += (DeltaTime * 10 * (7.5f - LerpDigit));
 		FullCloudTimer -= DeltaTime;
@@ -49,16 +52,17 @@ void ACloudBurst::Tick(float DeltaTime)
 		{ 
 			CloudBurstMovement->Velocity = (FVector(0, 0, 0));
 			CloudBurstMovement->ProjectileGravityScale = 0;
-			DidItHit = true;
+			bDidItHit = true;
 		}
 	}
 }
 
 void ACloudBurst::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	DidItHit = true;
+	bDidItHit = true;
 	CloudBurstMovement->Velocity = (FVector(0, 0, 0));
 	CloudBurstMovement->ProjectileGravityScale = 0;
+	bAudioStart = true;
 }
 
 void ACloudBurst::BeginPlay() 

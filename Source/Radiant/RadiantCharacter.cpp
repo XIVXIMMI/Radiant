@@ -43,7 +43,14 @@ ARadiantCharacter::ARadiantCharacter()
 
 	bIsFloating = false;
 	bIsFiring = false;
-
+	bApplyRecoil = false;
+	bRecoilReset = false;
+	FiringError = 1;
+	MovementError = 1;
+	Kills = 0;
+	
+	UltOrbs = 0;
+	bUltUi = false;
 
 	// Enum Default Values
 	EDirection = EMovementDirection::EStationary;
@@ -75,7 +82,9 @@ void ARadiantCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 	PlayerInputComponent->BindAction("ThirdAbility", IE_Pressed, this, &ARadiantCharacter::ThirdAbility);
 	PlayerInputComponent->BindAction("ThirdAbility", IE_Released, this, &ARadiantCharacter::StopThirdAbility);
 
-	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &ARadiantCharacter::Interact);
+	PlayerInputComponent->BindAction("Ultimate", IE_Pressed, this, &ARadiantCharacter::Ultimate);
+
+	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &ARadiantCharacter::InteractPressed);
 
 	// Bind jump events
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ARadiantCharacter::Jumping);
@@ -103,10 +112,90 @@ void ARadiantCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 void ARadiantCharacter::OnPrimaryAction()
 {
-	// Trigger the OnItemUsed Event
-	OnUseItem.Broadcast();
 	bIsFiring = true;
-	OnFireWeapon.Broadcast();
+
+	if (EWeapon == EWeaponEquipped::EPrimary)
+	{
+		if (bCanFire)
+		{
+			/*Bullet RayCast Parameters*/
+			FHitResult* HitResult = new FHitResult();
+			FVector ForwardVector = GetFirstPersonCameraComponent()->GetForwardVector();
+			FVector StartTrace = GetFirstPersonCameraComponent()->GetComponentLocation() + (ForwardVector * 200.0f);
+			FVector RightVector = GetFirstPersonCameraComponent()->GetRightVector();
+			FVector UpVector = GetFirstPersonCameraComponent()->GetUpVector();
+			FVector EndTrace = StartTrace + (ForwardVector * 10000.0f);
+
+			// incorporating movement error into the calculations for the raycast
+			if (MovementError > 1)
+			{
+				EndTrace += (UpVector * MovementError * FMath::RandRange(-200, 200) + (UpVector * MovementError * FMath::RandRange(-50, 50)));
+			}
+			if (FiringError > 1)
+			{
+				EndTrace += (RightVector * MovementError * FiringError * FMath::RandRange(-50, 50)) + 
+					(UpVector * MovementError * FMath::RandRange(-100, 100));
+			}
+
+			FCollisionQueryParams* CQP = new FCollisionQueryParams();
+			CQP->bReturnPhysicalMaterial = true;
+
+			// If the hit actor is not an enemy, just simply spawn a bullet impact decal,
+			// else we figure out which bodypart is hit and deal damage accordingly
+			// If an enemy is killed we calculate the ult orbs and current kills
+			if (GetWorld()->LineTraceSingleByChannel(*HitResult, StartTrace, EndTrace, ECC_Pawn, *CQP))
+			{
+				BodyPartHit = *HitResult;
+				ActorHit = BodyPartHit.GetActor();
+				if (!HitResult->GetActor()->ActorHasTag("Enemy"))
+				{
+					bSpawnDecal = true;
+					DecalLocation = HitResult->Location;
+					DecalNormal = HitResult->ImpactNormal;
+				}
+				else
+				{
+					EnemyHit = Cast<AEnemy>(ActorHit);
+					if (EnemyHit != nullptr)
+					{
+						OnEnemyHit.Broadcast();
+						EnemyHit->ApplyDamage(DamageDealt);
+						if (EnemyHit->bShouldDie)
+						{
+							Kills += 1;
+							EnemyHit->Death();
+							if (UltOrbs < MaxUltOrbs)
+							{
+								UltOrbs++;
+								if (UltOrbs == MaxUltOrbs)
+								{
+									bUltUi = true;
+									bCanUlt = true;
+								}
+							}
+						}
+					}
+					bSpawnDecal = false;
+				}
+			}
+
+			// broadcast that the weapon has been fired to cue audio, recoil, and fire rate timers.
+			OnFireWeapon.Broadcast();
+			RecoilAmount = 1.00f;
+			bApplyRecoil = true;
+			FireCount += 1;
+			bCanFire = false;
+			FireRate = 1.00f;
+			RecoilDuration = 1.00f;
+		}
+	}
+	
+	// If the player is using an ultimate weapon, then bullet calculations will be done in that class
+	if (EWeapon == EWeaponEquipped::EAbility) 
+	{
+		bIsFiring = false;
+		bUltFired = true;
+	}
 }
 
 void ARadiantCharacter::StopPrimaryAction()
@@ -146,7 +235,7 @@ void ARadiantCharacter::MoveForward(float Value)
 		// add movement in that direction
 		AddMovementInput(GetActorForwardVector(), Value);
 
-		//Vertical Direction
+		// Vertical Direction
 		if (Value > 0.0f)
 		{
 			EOrientation = EMovementDirection::EForward;
@@ -254,17 +343,166 @@ void ARadiantCharacter::StopJumping()
 	ACharacter::StopJumping();
 }
 
-void ARadiantCharacter::Interact() 
+void ARadiantCharacter::InteractPressed()
 {
 	bInteractApplied = true;
+}
+
+void ARadiantCharacter::Interact(FHitResult* OtherActor)
+{
+	// Current code only supports Vandal pickups
+	if (OtherActor->GetActor()->ActorHasTag("Vandal")) 
+	{
+		VandalInstance = Cast<AVandal>(OtherActor->GetActor());
+		VandalInstance->AttachToComponent(GetMesh1P(), FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+			FName(TEXT("GripPoint")));
+	}
+	bInteractApplied = false;
+}
+
+void ARadiantCharacter::Ultimate() 
+{
+	if (bCanUlt)
+	{
+		bUltActivated = true;
+	}
 }
 
 void ARadiantCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
+	
+	// If the player is spamming, make sure to continously call the firing function
 	if (bIsFiring)
 	{
-		OnFireWeapon.Broadcast();
+		ARadiantCharacter::OnPrimaryAction();
+	}
+
+	// Determining the bullet accuracy based on the player's movement,, (1 means full accuracy)
+	if (EDirection == EMovementDirection::EStationary && EOrientation == EMovementDirection::EStationary)
+	{
+		MovementError = 1;
+	}
+	else
+	{
+		MovementError = 5;
+	}
+	if (!bIsFiring)
+	{
+		FireCount = 0;
+		if (!bApplyRecoil && !bRecoilReset)
+		{
+			FiringError = 1;
+		}
+	}
+
+	if (bIsFloating)
+	{
+		MovementError = 10;
+	}
+
+	// fire rate calculation
+	if (!bCanFire)
+	{
+		FireRate -= DeltaTime * 6;
+		if (FireRate < 0)
+		{
+			bCanFire = true;
+		}
+	}
+
+	// firing error initiation
+	if (FireCount > 4)
+	{
+		FiringError = FireCount;
+	}
+
+	// Recoil Application by adding rotational input
+	// Recoil depends on the amount of bullets fired and movement 
+	if (bApplyRecoil)
+	{
+		float RandomRecoil = FMath::RandRange(-1, 1);
+		if (RecoilAmount > 0)
+		{
+			RecoilAmount -= DeltaTime * 9;
+			if (bApplyHorizontalRecoil)
+			{
+				AddControllerYawInput(RecoilAmount * DeltaTime * RandomRecoil * 10);
+				AddControllerPitchInput(RecoilAmount * DeltaTime * 2.5f * -1);
+			}
+			else
+			{
+				AddControllerPitchInput(RecoilAmount * DeltaTime * 5 * -1);
+			}
+		}
+		else {
+			bRecoilReset = true;
+		}
+
+		if (bRecoilReset)
+		{
+			if (RecoilDuration > 0)
+			{
+				if (bApplyHorizontalRecoil)
+				{
+					AddControllerYawInput(RecoilDuration * DeltaTime * RandomRecoil * 30 * -1);
+					RecoilDuration -= DeltaTime * 7;
+				}
+				if (bIsFiring)
+				{
+					AddControllerPitchInput(RecoilDuration * DeltaTime);
+					RecoilDuration -= DeltaTime * 9;
+				}
+				else {
+					AddControllerPitchInput(RecoilDuration * DeltaTime * 5);
+					RecoilDuration -= DeltaTime * 7;
+				}
+			}
+			else {
+				bApplyHorizontalRecoil = false;
+				bRecoilReset = false;
+				bApplyRecoil = false;
+			}
+		}
+	}
+	
+	// raycast for interactbles detection
+	FHitResult* HitResult = new FHitResult();
+	FVector NewStartTrace = GetFirstPersonCameraComponent()->GetComponentLocation();
+	FCollisionQueryParams* CQP = new FCollisionQueryParams();
+
+	if (GetWorld()->LineTraceSingleByChannel(*HitResult, NewStartTrace, 
+		((GetFirstPersonCameraComponent()->GetForwardVector() * 100.0f) + NewStartTrace), 
+		ECC_Visibility, *CQP))
+	{
+		if (HitResult != NULL)
+		{
+			if (HitResult->GetActor()->ActorHasTag("Vandal"))
+			{
+				if (bInteractApplied)
+				{
+					EWeapon = EWeaponEquipped::EPrimary;
+					bCanFire = true;
+					ARadiantCharacter::Interact(HitResult);
+				}
+			}
+			else
+			{
+				bInteractApplied = false;
+			}
+		}
+	}
+	else
+	{
+		bInteractApplied = false;
+	}
+
+	// If the vandal is not equipped currently, hide it until it is equipped
+	if (EWeapon != EWeaponEquipped::EPrimary)
+	{
+		if (VandalInstance != nullptr)
+		{
+			VandalInstance->SetActorHiddenInGame(true);
+		}
 	}
 }

@@ -23,12 +23,6 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	USphereComponent* PickUpSphere;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	bool bDisplayUI;
-
-	UFUNCTION()
-	void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
-
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

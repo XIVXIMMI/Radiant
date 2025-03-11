@@ -6,6 +6,7 @@
 
 AJett::AJett() 
 {
+
 	/*Jett Dash Variables*/
 	DashDistance = 10.0f;
 	DashSpeed = 50.0f;
@@ -18,6 +19,9 @@ AJett::AJett()
 	bDashUI = true;
 	bTimerUI = false;
 	bIsDashing = false;
+	bCanDash = true;
+	DashResetKills = 0;
+	DashResetStart = 0;
 
 	//Cloudburst Variables
 	CloudBurstSpawned = false;
@@ -33,22 +37,30 @@ AJett::AJett()
 	bCanFire = false;
 	FireRate = 1.00f;
 	FireCount = 0;
+
+	MaxUltOrbs = 8;
+	KnifeCount = 5;
 }
 
 void AJett::BeginPlay() 
 {
 	Super::BeginPlay();
-
-	OnFireWeapon.AddDynamic(this, &AJett::Fire);
 }
 
 void AJett::Dash()
 {
-	if (!bIsDashing)
+	if (bCanDash)
 	{
+		// The first button press activates the dash and the next press executes it.
+		// 2 broadcasts for audio
 		if (bDashApplied)
 		{
-			bCanDash = true;
+			OnDashStarted.Broadcast();
+			bIsDashing = true;
+		}
+		else
+		{
+			OnDashActivated.Broadcast();
 		}
 		DashActivationTimer = 3.0f;
 		bDashApplied = true;
@@ -63,6 +75,7 @@ void AJett::Dash()
 
 		JettForwardVector = GetActorForwardVector();
 		JettRightVector = GetActorRightVector();
+		DashResetStart = Kills;
 	}
 }
 
@@ -70,6 +83,7 @@ void AJett::Updraft()
 {
 	if (bCanUpdraft)
 	{
+		OnUpdraftStarted.Broadcast();
 		LaunchCharacter(FVector(0, 0, 1000), false, false);
 		bCanUpdraft = false;
 		bUpdraftUI = false;
@@ -78,14 +92,11 @@ void AJett::Updraft()
 
 AActor* AJett::CloudBurst()
 {
+	// Spawning params
 	UWorld* const World = GetWorld();
-
 	FRotator SpawnRotation = GetFirstPersonCameraComponent()->GetComponentRotation();
-
 	FVector SpawnAdjustment = GetFirstPersonCameraComponent()->GetForwardVector() * 50;
-
 	FVector SpawnLocation = GetFirstPersonCameraComponent()->GetComponentLocation() + SpawnAdjustment;
-
 	FActorSpawnParameters ActorSpawnParams;
 	ActorSpawnParams.Instigator = this;
 	ActorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
@@ -93,31 +104,129 @@ AActor* AJett::CloudBurst()
 	AActor* SpawnedCloud = World->SpawnActor<ACloudBurst>(Cloud, SpawnLocation, SpawnRotation, ActorSpawnParams);
 
 	CloudBurstStorage -= 1;
+
+	// return the spawned cloudburst that will be controlled in the tick function
 	return SpawnedCloud;
 }
 
-
-void AJett::Interact(FHitResult* OtherActor)
+void AJett::Knives()
 {
-	OtherActor->GetActor()->AttachToComponent(GetMesh1P(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName(TEXT("GripPoint")));
-	bInteractApplied = false;
-}
-
-void AJett::Fire() 
-{
-	/*RayCast Parameters*/
-	FHitResult* HitResult = new FHitResult();
-	FVector StartTrace = GetFirstPersonCameraComponent()->GetComponentLocation();
-	FVector ForwardVector = GetFirstPersonCameraComponent()->GetForwardVector();
-	FCollisionQueryParams* CQP = new FCollisionQueryParams();
-
-	if (GetWorld()->LineTraceSingleByChannel(*HitResult, StartTrace, ((ForwardVector * 1000.0f) + StartTrace), ECC_Visibility, *CQP))
+	// first we distinguish if the ult has been activated or fired
+	// we spawn 5 knives, set their locations, and control their visibility 
+	if (!bUltFired)
 	{
-		DrawDebugLine(GetWorld(), StartTrace, (ForwardVector * 50000.0f + StartTrace), FColor(255, 255, 0), true);
+		OnUltStarted.Broadcast();
+		KnifeCount = 5;
+		EWeapon = EWeaponEquipped::EAbility;
+		bUltActivated = false;
+		bCanUlt = false;
+
+		// Spawn params
+		UWorld* const World = GetWorld();
+		FActorSpawnParameters ActorSpawnParams;
+		ActorSpawnParams.Instigator = this;
+		ActorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+		Knife1Instance = World->SpawnActor<AJettKnife>(Knife, GetActorLocation(),
+			GetFirstPersonCameraComponent()->GetComponentRotation(), ActorSpawnParams);
+		Knife1Instance->AttachToComponent(GetMesh1P(), FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+			FName(TEXT("Knife1")));
+
+		Knife2Instance = World->SpawnActor<AJettKnife>(Knife, GetActorLocation(),
+			GetFirstPersonCameraComponent()->GetComponentRotation(), ActorSpawnParams);
+		Knife2Instance->AttachToComponent(GetMesh1P(), FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+			FName(TEXT("Knife2")));
+
+		Knife3Instance = World->SpawnActor<AJettKnife>(Knife, GetActorLocation(),
+			GetFirstPersonCameraComponent()->GetComponentRotation(), ActorSpawnParams);
+		Knife3Instance->AttachToComponent(GetMesh1P(), FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+			FName(TEXT("Knife3")));
+
+		Knife4Instance = World->SpawnActor<AJettKnife>(Knife, GetActorLocation(),
+			GetFirstPersonCameraComponent()->GetComponentRotation(), ActorSpawnParams);
+		Knife4Instance->AttachToComponent(GetMesh1P(), FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+			FName(TEXT("Knife4")));
+
+		Knife5Instance = World->SpawnActor<AJettKnife>(Knife, GetActorLocation(),
+			GetFirstPersonCameraComponent()->GetComponentRotation(), ActorSpawnParams);
+		Knife5Instance->AttachToComponent(GetMesh1P(), FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+			FName(TEXT("Knife5")));
 	}
-	FireCount += 1;
-	bCanFire = false;
-	FireRate = 1.00f;
+	else
+	{
+		// this part is similar to the firing function in the parent class, but without the firing/movement errors
+		if (KnifeCount > 0)
+		{
+			KnifeCount--;
+			/*RayCast Parameters*/
+			FHitResult* HitResult = new FHitResult();
+			FVector ForwardVector = GetFirstPersonCameraComponent()->GetForwardVector();
+			FVector StartTrace = GetFirstPersonCameraComponent()->GetComponentLocation() + (ForwardVector * 200.0f);
+			FVector RightVector = GetFirstPersonCameraComponent()->GetRightVector();
+			FVector UpVector = GetFirstPersonCameraComponent()->GetUpVector();
+			FVector EndTrace = StartTrace + (ForwardVector * 10000.0f);
+			FCollisionQueryParams* CQP = new FCollisionQueryParams();
+			CQP->bReturnPhysicalMaterial = true;
+
+			if (GetWorld()->LineTraceSingleByChannel(*HitResult, StartTrace, EndTrace, ECC_Pawn, *CQP))
+			{
+				BodyPartHit = *HitResult;
+				ActorHit = BodyPartHit.GetActor();
+				if (HitResult->GetActor()->ActorHasTag("Enemy"))
+				{
+					EnemyHit = Cast<AEnemy>(ActorHit);
+					if (EnemyHit != nullptr)
+					{
+						OnEnemyHit.Broadcast();
+						EnemyHit->ApplyDamage(DamageDealt);
+						if (EnemyHit->bShouldDie)
+						{
+							Kills += 1;
+							KnifeCount = 5;
+							EnemyHit->Death();
+						}
+					}
+				}
+			}
+			OnFireWeapon.Broadcast();
+			bUltFired = false;
+			if (KnifeCount <= 0)
+			{
+				EWeapon = EWeaponEquipped::EPrimary;
+				VandalInstance->SetActorHiddenInGame(false);
+			}
+		}
+	}
+
+	switch (KnifeCount)
+	{
+	default:
+		break;
+
+	case 5:
+		Knife1Instance->SetActorHiddenInGame(false);
+		Knife2Instance->SetActorHiddenInGame(false);
+		Knife3Instance->SetActorHiddenInGame(false);
+		Knife4Instance->SetActorHiddenInGame(false);
+		Knife5Instance->SetActorHiddenInGame(false);
+		break;
+	case 4:
+		Knife1Instance->SetActorHiddenInGame(true);
+		break;
+	case 3:
+		Knife2Instance->SetActorHiddenInGame(true);
+		break;
+	case 2:
+		Knife3Instance->SetActorHiddenInGame(true);
+		break;
+	case 1:
+		Knife4Instance->SetActorHiddenInGame(true);
+		break; 
+	case 0:
+		Knife5Instance->SetActorHiddenInGame(true);
+		UltOrbs = 0;
+		break;
+	}
 }
 
 void AJett::Tick(float DeltaTime)
@@ -127,6 +236,7 @@ void AJett::Tick(float DeltaTime)
 	/*Jett Drift*/
 	if (bIsFloating && GetVelocity().Z < 0)
 	{
+		MovementError = 5;
 		GetCharacterMovement()->GravityScale = 0.05;
 	}
 	else {
@@ -134,6 +244,20 @@ void AJett::Tick(float DeltaTime)
 	}
 	
 	/*Jett Dash*/
+	if (!bCanDash)
+	{
+		DashResetKills = Kills - DashResetStart;
+		if (DashResetKills > 1)
+		{
+			bCanDash = true;
+			DashResetKills = 0;
+		}
+	}
+	else
+	{
+		bDashUI = true;
+	}
+
 	if (bFirstAbilityApplied)
 	{
 		bFirstAbilityApplied = false;
@@ -167,33 +291,15 @@ void AJett::Tick(float DeltaTime)
 		}
 	}
 
-	/*if the dash is completed, prevent the player from dashing again until the timer expires and control the UI*/
-	if (bAbilityTimerStart)
+	if (bUltActivated)
 	{
-		bTimerUI = false;
-		bDashUI = false;
-		FirstAbilityCooldown -= DeltaTime;
-		bFirstAbilityApplied = false;
-		bDashApplied = false;
-		bCanDash = false;
-
-		if (FirstAbilityCooldown < 0.0f)
-		{
-			bDashUI = true;
-			bAbilityTimerStart = false;
-			FirstAbilityCooldown = 10.0f;
-		}
+		AJett::Knives();
 	}
 
-	if (!bCanFire) 
+	if (bUltFired)
 	{
-		FireRate -= DeltaTime * 100;
-		if (FireRate < 0) 
-		{
-			bCanFire = true;
-		}
+		AJett::Knives();
 	}
-
 
 	/*RayCast Parameters*/
 	FHitResult* HitResult = new FHitResult();
@@ -216,7 +322,6 @@ void AJett::Tick(float DeltaTime)
 				{
 					if (!HitResult->GetActor()->ActorHasTag("Smoke"))
 					{
-						//DrawDebugLine(GetWorld(), StartTrace, ((ForwardVector * 200.0f) + StartTrace), FColor(255, 0, 0), true);
 						if (EDashOrientation == EMovementDirection::EForward || EDashOrientation == EMovementDirection::EStationary)
 						{
 							if (bCanDash)
@@ -291,24 +396,24 @@ void AJett::Tick(float DeltaTime)
 					{
 						if (EDashDirection == EMovementDirection::ELeft)
 						{
-							if (bCanDash)
+							if (bIsDashing)
 							{
-								bIsDashing = false;
+								bCanDash = false;
 								bDashApplied = false;
 								bAbilityTimerStart = true;
 							}
-							bCanDash = false;
+							bIsDashing = false;
 						}
 					}
 				}
 			}
 		}
 
-		if (bCanDash)
+		if (bIsDashing)
 		{
 			bTimerUI = false;
 			bDashUI = false;
-			bIsDashing = true;
+			bCanDash = false;
 
 			/*Distance to be travelled per tick*/
 			DashInterval = DashSpeed * DeltaTime * 100.0f;
@@ -348,7 +453,6 @@ void AJett::Tick(float DeltaTime)
 				bIsDashing = false;
 				bDashApplied = false;
 				bCanDash = false;
-				bAbilityTimerStart = true;
 			}
 		}
 		/*Timer set to limit the dash activation period*/
@@ -361,31 +465,5 @@ void AJett::Tick(float DeltaTime)
 			bDashApplied = false;
 			bAbilityTimerStart = true;
 		}
-	}
-
-	FVector NewStartTrace = GetFirstPersonCameraComponent()->GetComponentLocation();
-	if (GetWorld()->LineTraceSingleByChannel(*HitResult, NewStartTrace, ((GetFirstPersonCameraComponent()->GetForwardVector() * 100.0f) + NewStartTrace), ECC_Visibility, *CQP))
-	{
-		if (HitResult != NULL) 
-		{
-			if (HitResult->GetActor()->ActorHasTag("Vandal")) 
-			{
-				if (bInteractApplied)
-				{
-					EWeapon = EWeaponEquipped::EPrimary;
-					bCanFire = true;
-					AJett::Interact(HitResult);
-					DrawDebugLine(GetWorld(), NewStartTrace, ((GetFirstPersonCameraComponent()->GetForwardVector() * 100.0f) + NewStartTrace), FColor(255, 0, 0), true);
-				}
-			}
-			else
-			{
-				bInteractApplied = false;
-			}
-		}
-	}
-	else
-	{
-		bInteractApplied = false;
 	}
 }
